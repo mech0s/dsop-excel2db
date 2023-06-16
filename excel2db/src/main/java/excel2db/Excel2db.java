@@ -7,14 +7,17 @@ import java.sql.Connection;
 
 import java.sql.*;
 import java.util.Iterator;
+import java.util.Map.Entry;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Dictionary;
 import java.util.HashMap;
+import java.util.HashSet;
 
+import com.google.protobuf.MapEntry;
 import com.mysql.jdbc.Driver;
 
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -26,23 +29,63 @@ public class Excel2db {
 	public static void main(String[] args) {
 		
 		POI2MySQL tp = new POI2MySQL();
-		tp.convertExcelDoc();
+		//tp.convertExcelDoc();
+		tp.scrape_v2_2_tables();
 	}
+	
 
 }
 
 class POI2MySQL{
 	
-	static String fname = "DevSecOpsTools-ActivitiesGuidebookTableIndexABC.xlsx";
+	static String fname = "DevSecOpsActivitesToolsGuidebookTables.xlsx";
 	
 	static String excel2db_version = 
 // version			
-"20230522-3";
+"20230616-1";
 // version
-	static String xlsx_version = "read from worksheet name";
+	static String xlsx_version = "V2.2 25-05-23";
 	
+	
+	void scrape_v2_2_tables() {
+		
+		HashMap<String, Sheet> phaseSheets = new HashMap<String, Sheet>() ;
+
+		Set<String> phaseSet = new HashSet<String>(Arrays.asList(new String[] {"Plan","Develop","Build","Test","Release","Deliver","Deploy","Operate","Monitor","Feedback"}));
+
+		
+		try {
+			FileInputStream fis = new FileInputStream(fname);
+			XSSFWorkbook wb = new XSSFWorkbook(fis);
+	        for (int i = 0; i < wb.getNumberOfSheets(); i++) {
+	            Sheet sheet = wb.getSheetAt(i);
+	            String shName = sheet.getSheetName();
+	            if (phaseSet.contains(shName)) {
+	            	phaseSheets.put(shName, sheet);
+	            }     
+	        }
+
+            
+            
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		System.out.println(phaseSheets.size());
+		for ( Entry<String, Sheet> ess : phaseSheets.entrySet() ) {
+			System.out.println(ess.getKey());
+			System.out.println(ess.getValue().getSheetName());
+			System.out.println();
+		}
+	}
 	
 	void convertExcelDoc() {
+		
+
 		ArrayList<String[]> toolRows = new ArrayList<String[]>();
 		ArrayList<String[]> activityRows = new ArrayList<String[]>();
 		HashMap<String[],ArrayList<String>> activityInputs = new HashMap();
@@ -124,7 +167,7 @@ class POI2MySQL{
 	void insertToDb( ArrayList<String[]> toolRows, ArrayList<String[]> activityRows, HashMap<String[],ArrayList<String>> activityInputs, HashMap<String[],ArrayList<String>> activityOutputs, HashMap<String[],ArrayList<String>> activityTools, HashMap<String[],ArrayList<String>> toolInputs, HashMap<String[],ArrayList<String>> toolOutputs ) {
 		try {
 
-			Connection con = DriverManager.getConnection("jdbc:mysql://localhost:3306/devopstoolsraw","devopstools","devopstools");
+			Connection con = DriverManager.getConnection("jdbc:mysql://localhost:3306/dsopguidebooktablesraw","devopstools","devopstools");
 			Statement stmt = con.createStatement();
 			stmt.executeUpdate("truncate tools");
 			stmt.executeUpdate("truncate activities");
