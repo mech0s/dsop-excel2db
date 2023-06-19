@@ -29,8 +29,8 @@ public class Excel2db {
 	public static void main(String[] args) {
 		
 		POI2MySQL tp = new POI2MySQL();
-		//tp.convertExcelDoc();
-		tp.scrape_v2_2_tables();
+		tp.convertExcelDoc();
+		
 	}
 	
 
@@ -47,26 +47,69 @@ class POI2MySQL{
 	static String xlsx_version = "V2.2 25-05-23";
 	
 	
-	void scrape_v2_2_tables() {
-		
-		HashMap<String, Sheet> phaseSheets = new HashMap<String, Sheet>() ;
+	void populatePhaseSheets(XSSFWorkbook wb, Set<String> phaseSet, HashMap<String,Sheet> phaseSheets) {
 
-		Set<String> phaseSet = new HashSet<String>(Arrays.asList(new String[] {"Plan","Develop","Build","Test","Release","Deliver","Deploy","Operate","Monitor","Feedback"}));
+		for (int i = 0; i < wb.getNumberOfSheets(); i++) {
+			Sheet sheet = wb.getSheetAt(i);
+			String shName = sheet.getSheetName();
+			if (phaseSet.contains(shName)) {
+				phaseSheets.put(shName, sheet);
+			}
+		}
 
+	}
+
+	private XSSFWorkbook openWorkbook() throws FileNotFoundException, IOException {
+		FileInputStream fis = new FileInputStream(fname);
+		XSSFWorkbook wb = new XSSFWorkbook(fis);
+		return wb;
+	}
+	
+	void convertExcelDoc() {
+		HashMap<String, Sheet> phaseSheets = new HashMap<String, Sheet>();
+		Set<String> phaseSet = new HashSet<String>(Arrays.asList(new String[] { "Plan", "Develop", "Build", "Test",
+				"Release", "Deliver", "Deploy", "Operate", "Monitor", "Feedback" }));
 		
 		try {
-			FileInputStream fis = new FileInputStream(fname);
-			XSSFWorkbook wb = new XSSFWorkbook(fis);
-	        for (int i = 0; i < wb.getNumberOfSheets(); i++) {
-	            Sheet sheet = wb.getSheetAt(i);
-	            String shName = sheet.getSheetName();
-	            if (phaseSet.contains(shName)) {
-	            	phaseSheets.put(shName, sheet);
-	            }     
-	        }
+			XSSFWorkbook wb = openWorkbook();
 
+			populatePhaseSheets(wb, phaseSet, phaseSheets);
+			
+
+
+            ArrayList<String> headings = new ArrayList<>();
+            headings.add("Phase"); // first field is phase name
+            ArrayList<ArrayList<String>> data = new ArrayList<>();
+ 
             
-            
+            extractFromPhaseSheets(phaseSheets, headings, data);
+
+			for ( ArrayList<String> sal : data ) {
+				for ( String field : sal) {
+					System.out.printf("'%s',", field );
+					// if ( field.contains("\"")) System.out.println("double quotes");
+				}
+				System.out.println(  );
+			}
+			
+			
+
+//			ArrayList<String[]> toolRows = new ArrayList<String[]>();
+//			ArrayList<String[]> activityRows = new ArrayList<String[]>();
+//			HashMap<String[], ArrayList<String>> activityInputs = new HashMap();
+//			HashMap<String[], ArrayList<String>> activityOutputs = new HashMap();
+//			HashMap<String[], ArrayList<String>> activityTools = new HashMap();
+//			HashMap<String[], ArrayList<String>> toolInputs = new HashMap();
+//			HashMap<String[], ArrayList<String>> toolOutputs = new HashMap();
+//
+//			populateToolsActivitiesLists(toolRows, activityRows);
+//
+//			normaliseLists(toolRows, activityRows, activityInputs, activityOutputs, activityTools, toolInputs,
+//					toolOutputs);
+//
+//			insertToDb(toolRows, activityRows, activityInputs, activityOutputs, activityTools, toolInputs, toolOutputs);
+
+			System.out.println("OK");
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -74,37 +117,76 @@ class POI2MySQL{
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+
+	}
+
+	private void extractFromPhaseSheets(HashMap<String, Sheet> phaseSheets, ArrayList<String> headings,
+			ArrayList<ArrayList<String>> data) {
+		int minCols = 99; int maxCols=0; 
+		boolean needHeadings = true;
+		int sourceHeadingCount = 0;
 		
 		System.out.println(phaseSheets.size());
-		for ( Entry<String, Sheet> ess : phaseSheets.entrySet() ) {
+		for (Entry<String, Sheet> ess : phaseSheets.entrySet()) {
 			System.out.println(ess.getKey());
 			System.out.println(ess.getValue().getSheetName());
 			System.out.println();
-		}
-	}
-	
-	void convertExcelDoc() {
-		
+			
+			Sheet sh = ess.getValue();
+			boolean headingsRow = true;
+			Iterator<Row> iterator = sh.iterator();
+		    
+		    while (iterator.hasNext()) {
 
-		ArrayList<String[]> toolRows = new ArrayList<String[]>();
-		ArrayList<String[]> activityRows = new ArrayList<String[]>();
-		HashMap<String[],ArrayList<String>> activityInputs = new HashMap();
-		HashMap<String[],ArrayList<String>> activityOutputs = new HashMap();
-		HashMap<String[],ArrayList<String>> activityTools = new HashMap();
-		HashMap<String[],ArrayList<String>> toolInputs = new HashMap();
-		HashMap<String[],ArrayList<String>> toolOutputs = new HashMap();
-		
-		populateToolsActivitiesLists(toolRows, activityRows);
-		
-		normaliseLists(toolRows, activityRows, activityInputs, activityOutputs, activityTools, toolInputs, toolOutputs );
-		
-		insertToDb(toolRows, activityRows, activityInputs, activityOutputs, activityTools, toolInputs, toolOutputs);
-		
-		
-		
-		System.out.println("OK");
-		
-		
+		        Row currentRow = iterator.next();
+		        int ccount = 0;
+
+		        ArrayList<String> thisRowStrings = new ArrayList<String>();
+		        thisRowStrings.add(ess.getKey()); // first field is phase name
+		        Iterator<Cell> cellIterator = currentRow.iterator();
+		        while (cellIterator.hasNext()) {
+		        	Cell currentCell = cellIterator.next();
+		        	if (!needHeadings && ccount == sourceHeadingCount ) {
+		        		if ( !currentCell.getStringCellValue().equals("") ) {
+		        			System.out.println(" ------problem: non-blank cell beyond table" + sh.getSheetName() + currentCell.getStringCellValue());
+		        		}
+		            	break; 
+		        	}
+		        	
+		        	if ( headingsRow ) {
+		        		if (needHeadings) headings.add(currentCell.getStringCellValue());
+		        	} else {
+		                if (ccount == 0 ) { // detect unpopulated row and break 
+		                	if (currentCell.getStringCellValue() == "") {
+		                		System.out.println("--------------Blank");
+		                		break; 
+		                	}
+		                }
+		                thisRowStrings.add(currentCell.getStringCellValue());   // to escape double quote .replace("\"","\\\"")); // JSON needs double quotes 
+		      		}
+		        	
+		        	ccount ++; 	
+		        	System.out.println(currentCell.getStringCellValue());
+		        }
+		        if (ccount == 0) break; // not a populated row 
+		        
+		        if (headingsRow ) sourceHeadingCount = ccount;
+		        if (ccount < sourceHeadingCount ) {
+		        	System.out.println(" ------problem: short row" + sh.getSheetName());
+		        }
+		        if (ccount > sourceHeadingCount ) {
+		        	System.out.println(" ------problem: long row" + sh.getSheetName());
+		        }                    minCols = Math.min(minCols, ccount);
+		        maxCols = Math.max(maxCols, ccount);
+
+		        data.add(thisRowStrings);
+		        
+		        
+		        needHeadings = false;
+		        headingsRow = false;
+		        
+		    }
+		}
 	}
 	
 	private void normaliseLists(ArrayList<String[]> toolRows, ArrayList<String[]> activityRows,
@@ -313,8 +395,7 @@ class POI2MySQL{
 	void populateToolsActivitiesLists(ArrayList<String[]> toolRows, ArrayList<String[]> activityRows ) {
 		
 		try {
-			FileInputStream fis = new FileInputStream(fname);
-			XSSFWorkbook wb = new XSSFWorkbook(fis);
+			XSSFWorkbook wb = openWorkbook();
             Sheet datatypeSheet = wb.getSheetAt(0);
             xlsx_version = datatypeSheet.getSheetName();
             Iterator<Row> iterator = datatypeSheet.iterator();
