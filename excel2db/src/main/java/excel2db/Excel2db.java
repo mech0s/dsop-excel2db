@@ -42,7 +42,7 @@ class POI2MySQL{
 	
 	static String excel2db_version = 
 // version			
-"20230616-1";
+"20230619-1";
 // version
 	static String xlsx_version = "V2.2 25-05-23";
 	
