@@ -22,7 +22,7 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.xmlbeans.impl.xb.xsdschema.MaxExclusiveDocument;
-
+import com.google.gson.*;
 
 public class Excel2db {
 
@@ -79,20 +79,24 @@ class POI2MySQL{
 
             ArrayList<String> headings = new ArrayList<>();
             headings.add("Phase"); // first field is phase name
-            ArrayList<ArrayList<String>> data = new ArrayList<>();
+            ArrayList<HashMap<String, String>> data = new ArrayList<>();
  
             
             extractFromPhaseSheets(phaseSheets, headings, data);
 
-			for ( ArrayList<String> sal : data ) {
-				for ( String field : sal) {
-					System.out.printf("'%s',", field );
-					// if ( field.contains("\"")) System.out.println("double quotes");
-				}
-				System.out.println(  );
-			}
+//			for ( HashMap<String, String> hmss : data ) {
+//				for ( Entry<String, String> field : hmss.entrySet() ) {
+//					System.out.printf("'%s':'%s',", field.getKey(), field.getValue() );
+//
+//				}
+//				System.out.println(  );
+//			}
 			
+			Gson gson = new GsonBuilder().setPrettyPrinting().create();
+			String jsonString = gson.toJson(data);
 			
+			System.out.println(jsonString);
+			System.out.println(data.size());
 
 //			ArrayList<String[]> toolRows = new ArrayList<String[]>();
 //			ArrayList<String[]> activityRows = new ArrayList<String[]>();
@@ -121,16 +125,16 @@ class POI2MySQL{
 	}
 
 	private void extractFromPhaseSheets(HashMap<String, Sheet> phaseSheets, ArrayList<String> headings,
-			ArrayList<ArrayList<String>> data) {
+			ArrayList<HashMap<String,String>> data) {
 		int minCols = 99; int maxCols=0; 
 		boolean needHeadings = true;
 		int sourceHeadingCount = 0;
 		
-		System.out.println(phaseSheets.size());
+		// System.out.println(phaseSheets.size());
 		for (Entry<String, Sheet> ess : phaseSheets.entrySet()) {
-			System.out.println(ess.getKey());
-			System.out.println(ess.getValue().getSheetName());
-			System.out.println();
+//			System.out.println(ess.getKey());
+//			System.out.println(ess.getValue().getSheetName());
+//			System.out.println();
 			
 			Sheet sh = ess.getValue();
 			boolean headingsRow = true;
@@ -158,7 +162,7 @@ class POI2MySQL{
 		        	} else {
 		                if (ccount == 0 ) { // detect unpopulated row and break 
 		                	if (currentCell.getStringCellValue() == "") {
-		                		System.out.println("--------------Blank");
+		                		//System.out.println("--------------Blank");
 		                		break; 
 		                	}
 		                }
@@ -166,11 +170,21 @@ class POI2MySQL{
 		      		}
 		        	
 		        	ccount ++; 	
-		        	System.out.println(currentCell.getStringCellValue());
+		        	//System.out.println(currentCell.getStringCellValue());
 		        }
 		        if (ccount == 0) break; // not a populated row 
 		        
 		        if (headingsRow ) sourceHeadingCount = ccount;
+		        else
+		        {
+		        	HashMap<String, String> dict = new HashMap<>();
+		        	for (int i = 0; i < headings.size(); i++) {
+			            dict.put(headings.get(i), thisRowStrings.get(i));
+			        }
+			        data.add(dict);
+		        }
+		        
+		        // quality checks
 		        if (ccount < sourceHeadingCount ) {
 		        	System.out.println(" ------problem: short row" + sh.getSheetName());
 		        }
@@ -178,8 +192,7 @@ class POI2MySQL{
 		        	System.out.println(" ------problem: long row" + sh.getSheetName());
 		        }                    minCols = Math.min(minCols, ccount);
 		        maxCols = Math.max(maxCols, ccount);
-
-		        data.add(thisRowStrings);
+		        // quality checks
 		        
 		        
 		        needHeadings = false;
